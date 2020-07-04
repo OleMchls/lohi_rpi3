@@ -1,6 +1,7 @@
 defmodule NervesSystemRpi3.MixProject do
   use Mix.Project
 
+  @github_organization "OleMchls"
   @app :mpd_rpi3
   @version Path.join(__DIR__, "VERSION")
            |> File.read!()
@@ -10,7 +11,7 @@ defmodule NervesSystemRpi3.MixProject do
     [
       app: @app,
       version: @version,
-      elixir: "~> 1.4",
+      elixir: "~> 1.6",
       compilers: Mix.compilers() ++ [:nerves_package],
       nerves_package: nerves_package(),
       description: description(),
@@ -26,7 +27,7 @@ defmodule NervesSystemRpi3.MixProject do
   end
 
   defp bootstrap(args) do
-    System.put_env("MIX_TARGET", "rpi3")
+    set_target()
     Application.start(:nerves_bootstrap)
     Mix.Task.run("loadconfig", args)
   end
@@ -35,8 +36,9 @@ defmodule NervesSystemRpi3.MixProject do
     [
       type: :system,
       artifact_sites: [
-        {:github_releases, "OleMchls/#{@app}"}
+        {:github_releases, "#{@github_organization}/#{@app}"}
       ],
+      build_runner_opts: build_runner_opts(),
       platform: Nerves.System.BR,
       platform_config: [
         defconfig: "nerves_defconfig"
@@ -47,11 +49,11 @@ defmodule NervesSystemRpi3.MixProject do
 
   defp deps do
     [
-      {:nerves, "~> 1.0", runtime: false},
-      {:nerves_system_br, "1.4.1", runtime: false},
-      {:nerves_toolchain_arm_unknown_linux_gnueabihf, "1.1.0", runtime: false},
-      {:nerves_system_linter, "~> 0.3.0", runtime: false},
-      {:ex_doc, "~> 0.18", only: :dev}
+      {:nerves, "~> 1.5.4 or ~> 1.6.0", runtime: false},
+      {:nerves_system_br, "1.12.0", runtime: false},
+      {:nerves_toolchain_arm_unknown_linux_gnueabihf, "~> 1.3.0", runtime: false},
+      {:nerves_system_linter, "~> 0.4", only: [:dev, :test], runtime: false},
+      {:ex_doc, "~> 0.18", only: [:dev, :test], runtime: false}
     ]
   end
 
@@ -63,33 +65,51 @@ defmodule NervesSystemRpi3.MixProject do
 
   defp package do
     [
-      maintainers: ["Ole Michaelis"],
       files: package_files(),
       licenses: ["Apache 2.0"],
-      links: %{"Github" => "https://github.com/OleMchls/#{@app}"}
+      links: %{"GitHub" => "https://github.com/#{@github_organization}/#{@app}"}
     ]
   end
 
   defp package_files do
     [
+      "fwup_include",
+      "rootfs_overlay",
+      "CHANGELOG.md",
+      "cmdline.txt",
+      "config.txt",
+      "fwup-revert.conf",
+      "fwup.conf",
       "LICENSE",
+      "linux-4.19.defconfig",
       "mix.exs",
       "nerves_defconfig",
-      "README.md",
-      "VERSION",
-      "rootfs_overlay",
-      "fwup.conf",
-      "fwup-revert.conf",
-      "post-createfs.sh",
       "post-build.sh",
-      "cmdline.txt",
-      "linux-4.9.defconfig",
-      "config.txt"
+      "post-createfs.sh",
+      "ramoops.dts",
+      "README.md",
+      "VERSION"
     ]
   end
 
   # Copy the images referenced by docs, since ex_doc doesn't do this.
   defp copy_images(_) do
     File.cp_r("assets", "doc/assets")
+  end
+
+  defp build_runner_opts() do
+    if primary_site = System.get_env("BR2_PRIMARY_SITE") do
+      [make_args: ["BR2_PRIMARY_SITE=#{primary_site}"]]
+    else
+      []
+    end
+  end
+
+  defp set_target() do
+    if function_exported?(Mix, :target, 1) do
+      apply(Mix, :target, [:target])
+    else
+      System.put_env("MIX_TARGET", "target")
+    end
   end
 end
